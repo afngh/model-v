@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
  * Reusable scientific Canvas wrapper component (matplotlib / textbook style).
  * - Thin black border with white background.
  * - Handles window resize, high-DPI (devicePixelRatio) rendering, and mobile touch interaction.
+ * - Supports vertical page scrolling on mobile via touch-pan-y.
  * - Exposes canvas ref, 2D context, and dimensions to children / render callback.
  */
 const Canvas = ({
@@ -106,7 +107,7 @@ const Canvas = ({
         ref={canvasRef}
         onClick={handleClick}
         onTouchStart={handleClick}
-        className="block cursor-crosshair touch-none"
+        className="block cursor-crosshair touch-pan-y"
       />
 
       {typeof children === 'function'

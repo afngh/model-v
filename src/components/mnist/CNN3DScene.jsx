@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
 /**
- * Three.js 3D Adam Harley-Style CNN Visualizer Scene with Selective Stage Opacity.
+ * Three.js 3D Adam Harley-Style CNN Visualizer Scene with Touch Support & Selective Stage Opacity.
  * Render pipeline (Steps 1 to 6):
  * Step 1: Tilted 28x28 Input Grid Card
  * Step 2: Shrinking Conv + Pool 3D Cube Blocks
@@ -28,9 +28,9 @@ const CNN3DScene = ({ pixels784, predictions, pulseStep }) => {
     output: []
   });
 
-  // Mouse drag Orbit state
+  // Mouse / Touch drag Orbit state
   const isDraggingRef = useRef(false);
-  const previousMousePosRef = useRef({ x: 0, y: 0 });
+  const previousTouchPosRef = useRef({ x: 0, y: 0 });
   const rotationRef = useRef({ x: 0.25, y: -0.35 });
 
   useEffect(() => {
@@ -275,38 +275,57 @@ const CNN3DScene = ({ pixels784, predictions, pulseStep }) => {
 
     animate();
 
-    // Mouse Drag Orbit Controls
-    const handleMouseDown = (e) => {
+    // Mouse & Touch Drag Orbit Controls (Touch-friendly)
+    const handleStart = (clientX, clientY) => {
       isDraggingRef.current = true;
-      previousMousePosRef.current = { x: e.clientX, y: e.clientY };
+      previousTouchPosRef.current = { x: clientX, y: clientY };
     };
 
-    const handleMouseMove = (e) => {
+    const handleMove = (clientX, clientY) => {
       if (!isDraggingRef.current) return;
-      const deltaX = e.clientX - previousMousePosRef.current.x;
-      const deltaY = e.clientY - previousMousePosRef.current.y;
+      const deltaX = clientX - previousTouchPosRef.current.x;
+      const deltaY = clientY - previousTouchPosRef.current.y;
 
       rotationRef.current.y += deltaX * 0.008;
       rotationRef.current.x += deltaY * 0.008;
 
       rotationRef.current.x = Math.max(-0.8, Math.min(0.8, rotationRef.current.x));
-      previousMousePosRef.current = { x: e.clientX, y: e.clientY };
+      previousTouchPosRef.current = { x: clientX, y: clientY };
     };
 
-    const handleMouseUp = () => {
+    const handleEnd = () => {
       isDraggingRef.current = false;
     };
+
+    const handleMouseDown = (e) => handleStart(e.clientX, e.clientY);
+    const handleMouseMove = (e) => handleMove(e.clientX, e.clientY);
+    const handleMouseUp = () => handleEnd();
+
+    const handleTouchStart = (e) => {
+      if (e.touches && e.touches[0]) handleStart(e.touches[0].clientX, e.touches[0].clientY);
+    };
+    const handleTouchMove = (e) => {
+      if (e.touches && e.touches[0]) handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    };
+    const handleTouchEnd = () => handleEnd();
 
     const domElem = renderer.domElement;
     domElem.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
 
+    domElem.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd);
+
     return () => {
       cancelAnimationFrame(animId);
       domElem.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      domElem.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
       if (container.contains(domElem)) {
         container.removeChild(domElem);
       }
@@ -384,7 +403,7 @@ const CNN3DScene = ({ pixels784, predictions, pulseStep }) => {
   return (
     <div
       ref={containerRef}
-      className="w-full h-[380px] bg-black cursor-grab active:cursor-grabbing select-none relative"
+      className="w-full h-[380px] bg-black cursor-grab active:cursor-grabbing select-none relative touch-pan-y"
     >
       {/* Harley-Style Pipeline Stage Labels */}
       <div className="absolute bottom-2 left-4 right-4 flex justify-between text-[10px] font-mono text-slate-400 pointer-events-none">

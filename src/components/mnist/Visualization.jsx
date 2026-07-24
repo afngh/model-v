@@ -209,7 +209,7 @@ const Visualization = () => {
               onTouchStart={startDrawing}
               onTouchMove={draw}
               onTouchEnd={stopDrawing}
-              className="touch-none block"
+              className="touch-pan-y block"
             />
           </div>
 
