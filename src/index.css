@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #ffffff;
+    color: #0f172a;
+  }
+
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Scientific Matplotlib / Textbook Plain Box Utilities */
+.plain-card {
+  background-color: #ffffff;
+  border: 1px solid #0f172a;
+  border-radius: 2px;
+}
+
+.plain-button {
+  background-color: #ffffff;
+  color: #0f172a;
+  border: 1px solid #0f172a;
+  border-radius: 2px;
+  font-weight: 500;
+  padding: 6px 14px;
+  font-size: 13px;
+  transition: background-color 0.1s ease;
+}
+
+.plain-button:hover:not(:disabled) {
+  background-color: #f1f5f9;
+}
+
+.plain-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.plain-button-primary {
+  background-color: #0f172a;
+  color: #ffffff;
+  border: 1px solid #0f172a;
+  border-radius: 2px;
+  font-weight: 500;
+  padding: 6px 14px;
+  font-size: 13px;
+  transition: background-color 0.1s ease;
+}
+
+.plain-button-primary:hover:not(:disabled) {
+  background-color: #334155;
+}
+
+.plain-button-danger {
+  background-color: #ffffff;
+  color: #dc2626;
+  border: 1px solid #dc2626;
+  border-radius: 2px;
+  font-weight: 500;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+.plain-button-danger:hover:not(:disabled) {
+  background-color: #fef2f2;
+}
+
+/* Custom Minimal Range Slider */
+input[type="range"].plain-slider {
+  accent-color: #0f172a;
+}
