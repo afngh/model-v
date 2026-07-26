@@ -394,7 +394,7 @@ const Visualization = () => {
           </div>
 
           <div>
-            <label className="font-mono font-semibold block mb-1">Max Iterations (Up to 10k)</label>
+            <label className="font-mono font-semibold block mb-1">Iterations</label>
             <input
               type="number"
               step="50"
