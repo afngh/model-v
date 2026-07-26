@@ -5,28 +5,25 @@ import Button from '../Button';
 import BeforeAfterThumbnail from '../diagrams/BeforeAfterThumbnail';
 import { stepGradientDescent, calculateMSE, predict } from '../../utils/linearRegression';
 
-// Fixed, deterministic dataset (no random variance)
+// Fixed, well-spaced deterministic points with distinct visual distance across canvas
 const FIXED_DEFAULT_POINTS = [
-  { x: 0.10, y: 0.22 },
-  { x: 0.15, y: 0.28 },
-  { x: 0.20, y: 0.25 },
-  { x: 0.28, y: 0.36 },
-  { x: 0.35, y: 0.38 },
-  { x: 0.40, y: 0.45 },
-  { x: 0.48, y: 0.48 },
-  { x: 0.55, y: 0.58 },
-  { x: 0.60, y: 0.54 },
-  { x: 0.68, y: 0.66 },
-  { x: 0.75, y: 0.72 },
-  { x: 0.82, y: 0.78 },
-  { x: 0.88, y: 0.85 },
-  { x: 0.92, y: 0.82 }
+  { x: 0.08, y: 0.15 },
+  { x: 0.18, y: 0.32 },
+  { x: 0.26, y: 0.22 },
+  { x: 0.34, y: 0.44 },
+  { x: 0.44, y: 0.35 },
+  { x: 0.52, y: 0.62 },
+  { x: 0.62, y: 0.51 },
+  { x: 0.72, y: 0.76 },
+  { x: 0.82, y: 0.68 },
+  { x: 0.92, y: 0.88 }
 ];
 
-// Fixed starting weights & optimal learning rate for instant convergence
-const FIXED_INITIAL_M = 0.30;
+// Fixed starting weights & optimal learning rate for fast convergence
+const FIXED_INITIAL_M = 0.25;
 const FIXED_INITIAL_B = 0.20;
-const DEFAULT_LEARNING_RATE = 0.15;
+const DEFAULT_LEARNING_RATE = 0.18;
+const DEFAULT_MAX_ITERATIONS = 30;
 
 const Visualization = () => {
   // Points in normalized space [0, 1]
@@ -35,6 +32,7 @@ const Visualization = () => {
   const [m, setM] = useState(FIXED_INITIAL_M);
   const [b, setB] = useState(FIXED_INITIAL_B);
   const [learningRate, setLearningRate] = useState(DEFAULT_LEARNING_RATE);
+  const [maxIterations, setMaxIterations] = useState(DEFAULT_MAX_ITERATIONS);
   const [isRunning, setIsRunning] = useState(false);
   const [iterations, setIterations] = useState(0);
 
@@ -49,20 +47,30 @@ const Visualization = () => {
   const mRef = useRef(m);
   const bRef = useRef(b);
   const lrRef = useRef(learningRate);
+  const maxIterRef = useRef(maxIterations);
   const isRunningRef = useRef(isRunning);
+  const iterationsRef = useRef(iterations);
   const animFrameIdRef = useRef(null);
 
   useEffect(() => { pointsRef.current = points; }, [points]);
   useEffect(() => { mRef.current = m; }, [m]);
   useEffect(() => { bRef.current = b; }, [b]);
   useEffect(() => { lrRef.current = learningRate; }, [learningRate]);
+  useEffect(() => { maxIterRef.current = maxIterations; }, [maxIterations]);
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
+  useEffect(() => { iterationsRef.current = iterations; }, [iterations]);
 
   const currentMSE = calculateMSE(points, m, b);
+  const isConverged = iterations >= maxIterations;
 
-  // Single step gradient descent execution
+  // Single step gradient descent execution with max iterations limit check
   const handleSingleStep = useCallback(() => {
     if (pointsRef.current.length === 0) return;
+    if (iterationsRef.current >= maxIterRef.current) {
+      setIsRunning(false);
+      return;
+    }
+
     const updated = stepGradientDescent(
       pointsRef.current,
       mRef.current,
@@ -77,19 +85,26 @@ const Visualization = () => {
     bRef.current = newB;
     setM(newM);
     setB(newB);
-    setIterations(prev => prev + 1);
+    const nextIter = iterationsRef.current + 1;
+    setIterations(nextIter);
     setLossHistory(prev => [...prev.slice(-150), newMse]);
+
+    if (nextIter >= maxIterRef.current) {
+      setIsRunning(false);
+    }
   }, []);
 
-  // Animation Loop (Fast Gradient Descent - 25ms per step)
+  // Animation Loop (Fast Gradient Descent with limited iterations)
   useEffect(() => {
     let lastTime = 0;
     const loop = (timestamp) => {
-      if (isRunningRef.current && pointsRef.current.length > 0) {
+      if (isRunningRef.current && pointsRef.current.length > 0 && iterationsRef.current < maxIterRef.current) {
         if (timestamp - lastTime > 25) {
           lastTime = timestamp;
           handleSingleStep();
         }
+      } else if (iterationsRef.current >= maxIterRef.current && isRunningRef.current) {
+        setIsRunning(false);
       }
       animFrameIdRef.current = requestAnimationFrame(loop);
     };
@@ -222,13 +237,13 @@ const Visualization = () => {
     ctx.lineTo(toCanvasX(1), toCanvasY(y1));
     ctx.stroke();
 
-    // Scatter Points (Black dots)
+    // Scatter Points (Black dots with distinct visual spacing)
     points.forEach(p => {
       const px = toCanvasX(p.x);
       const py = toCanvasY(p.y);
 
       ctx.beginPath();
-      ctx.arc(px, py, 4, 0, Math.PI * 2);
+      ctx.arc(px, py, 4.5, 0, Math.PI * 2);
       ctx.fillStyle = '#000000';
       ctx.fill();
     });
@@ -292,7 +307,7 @@ const Visualization = () => {
     <div className="space-y-6">
       {/* One-Line Reminder */}
       <div className="text-xs text-slate-600 bg-slate-50 p-2.5 border border-slate-300 rounded-sm font-mono">
-        💡 Click on the canvas to place points, then click <strong>Run Gradient Descent</strong> to observe model fitting.
+        💡 Click on the canvas to place points, then click <strong>Run Gradient Descent</strong> to observe model fitting (stops at {maxIterations} max iterations).
       </div>
 
       {/* Main Plots Layout */}
@@ -321,10 +336,10 @@ const Visualization = () => {
       {/* Numeric Input Fields Section */}
       <div className="bg-slate-50 p-4 border border-slate-300 rounded-sm space-y-4">
         <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide border-b border-slate-200 pb-2">
-          Numeric Input Fields & Hyperparameters
+          Numeric Input Fields & Hyperparameters (Max {maxIterations} Iterations)
         </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 text-xs">
           <div>
             <label className="font-mono font-semibold block mb-1">Learning Rate (α)</label>
             <input
@@ -334,6 +349,19 @@ const Visualization = () => {
               max="0.5"
               value={learningRate}
               onChange={(e) => setLearningRate(Math.max(0.01, Math.min(0.5, parseFloat(e.target.value) || 0.01)))}
+              className="w-full px-2 py-1 bg-white border border-slate-900 font-mono text-xs"
+            />
+          </div>
+
+          <div>
+            <label className="font-mono font-semibold block mb-1">Max Iterations</label>
+            <input
+              type="number"
+              step="5"
+              min="5"
+              max="100"
+              value={maxIterations}
+              onChange={(e) => setMaxIterations(Math.max(5, Math.min(100, parseInt(e.target.value) || 30)))}
               className="w-full px-2 py-1 bg-white border border-slate-900 font-mono text-xs"
             />
           </div>
@@ -363,12 +391,12 @@ const Visualization = () => {
           </div>
 
           <div>
-            <label className="font-mono font-semibold block mb-1">Iterations</label>
+            <label className="font-mono font-semibold block mb-1">Status</label>
             <input
               type="text"
               readOnly
-              value={iterations}
-              className="w-full px-2 py-1 bg-slate-100 border border-slate-300 font-mono text-xs font-bold"
+              value={isConverged ? `CONVERGED (${iterations}/${maxIterations})` : isRunning ? `RUNNING (${iterations}/${maxIterations})` : `READY (${iterations}/${maxIterations})`}
+              className={`w-full px-2 py-1 border font-mono text-xs font-bold ${isConverged ? 'bg-green-100 border-green-600 text-green-800' : 'bg-slate-100 border-slate-300 text-slate-800'}`}
             />
           </div>
         </div>
@@ -427,13 +455,19 @@ const Visualization = () => {
         <div className="flex items-center gap-3">
           <Button
             variant={isRunning ? 'secondary' : 'primary'}
-            onClick={() => setIsRunning(!isRunning)}
+            onClick={() => {
+              if (isConverged) {
+                setIterations(0);
+                setLossHistory([]);
+              }
+              setIsRunning(!isRunning);
+            }}
             disabled={points.length === 0}
           >
-            {isRunning ? 'Pause' : 'Run Gradient Descent'}
+            {isRunning ? 'Pause' : isConverged ? 'Restart' : 'Run Gradient Descent'}
           </Button>
 
-          <Button variant="outline" onClick={handleSingleStep} disabled={isRunning || points.length === 0}>
+          <Button variant="outline" onClick={handleSingleStep} disabled={isRunning || isConverged || points.length === 0}>
             Step
           </Button>
 
