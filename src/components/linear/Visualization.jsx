@@ -19,11 +19,11 @@ const FIXED_DEFAULT_POINTS = [
   { x: 0.92, y: 0.88 }
 ];
 
-// Fixed starting weights & optimal learning rate for fast convergence
+// Fixed starting weights & optimal learning rate
 const FIXED_INITIAL_M = 0.25;
 const FIXED_INITIAL_B = 0.20;
 const DEFAULT_LEARNING_RATE = 0.18;
-const DEFAULT_MAX_ITERATIONS = 30;
+const DEFAULT_MAX_ITERATIONS = 50;
 
 const Visualization = () => {
   // Points in normalized space [0, 1]
@@ -63,7 +63,7 @@ const Visualization = () => {
   const currentMSE = calculateMSE(points, m, b);
   const isConverged = iterations >= maxIterations;
 
-  // Single step gradient descent execution with max iterations limit check
+  // Single step gradient descent execution
   const handleSingleStep = useCallback(() => {
     if (pointsRef.current.length === 0) return;
     if (iterationsRef.current >= maxIterRef.current) {
@@ -87,21 +87,61 @@ const Visualization = () => {
     setB(newB);
     const nextIter = iterationsRef.current + 1;
     setIterations(nextIter);
-    setLossHistory(prev => [...prev.slice(-150), newMse]);
+    setLossHistory(prev => [...prev.slice(-300), newMse]);
 
     if (nextIter >= maxIterRef.current) {
       setIsRunning(false);
     }
   }, []);
 
-  // Animation Loop (Fast Gradient Descent with limited iterations)
+  // Multi-step gradient descent execution (runs chunk of steps per frame for high maxIterations up to 10k)
+  const handleMultiSteps = useCallback((stepBatchCount = 1) => {
+    if (pointsRef.current.length === 0) return;
+    let curM = mRef.current;
+    let curB = bRef.current;
+    let curIter = iterationsRef.current;
+    const newLosses = [];
+
+    for (let s = 0; s < stepBatchCount; s++) {
+      if (curIter >= maxIterRef.current) {
+        setIsRunning(false);
+        break;
+      }
+      const updated = stepGradientDescent(
+        pointsRef.current,
+        curM,
+        curB,
+        lrRef.current
+      );
+      curM = updated.m;
+      curB = updated.b;
+      curIter++;
+      const newMse = calculateMSE(pointsRef.current, curM, curB);
+      newLosses.push(newMse);
+    }
+
+    mRef.current = curM;
+    bRef.current = curB;
+    setM(curM);
+    setB(curB);
+    setIterations(curIter);
+    setLossHistory(prev => [...prev.slice(-300), ...newLosses]);
+
+    if (curIter >= maxIterRef.current) {
+      setIsRunning(false);
+    }
+  }, []);
+
+  // Animation Loop (Adaptive speed supporting up to 10,000 max iterations)
   useEffect(() => {
     let lastTime = 0;
     const loop = (timestamp) => {
       if (isRunningRef.current && pointsRef.current.length > 0 && iterationsRef.current < maxIterRef.current) {
         if (timestamp - lastTime > 25) {
           lastTime = timestamp;
-          handleSingleStep();
+          // Calculate adaptive batch size per frame based on maxIterations
+          const stepsPerFrame = Math.max(1, Math.min(100, Math.ceil(maxIterRef.current / 200)));
+          handleMultiSteps(stepsPerFrame);
         }
       } else if (iterationsRef.current >= maxIterRef.current && isRunningRef.current) {
         setIsRunning(false);
@@ -116,7 +156,7 @@ const Visualization = () => {
         cancelAnimationFrame(animFrameIdRef.current);
       }
     };
-  }, [handleSingleStep]);
+  }, [handleMultiSteps]);
 
   // Handle Canvas Mouse Clicks to add point
   const handleCanvasClick = ({ canvasX, canvasY, event }) => {
@@ -307,7 +347,7 @@ const Visualization = () => {
     <div className="space-y-6">
       {/* One-Line Reminder */}
       <div className="text-xs text-slate-600 bg-slate-50 p-2.5 border border-slate-300 rounded-sm font-mono">
-        💡 Click on the canvas to place points, then click <strong>Run Gradient Descent</strong> to observe model fitting (stops at {maxIterations} max iterations).
+        💡 Click on the canvas to place points, then click <strong>Run Gradient Descent</strong> to observe model fitting (up to {maxIterations.toLocaleString()} iterations).
       </div>
 
       {/* Main Plots Layout */}
@@ -336,7 +376,7 @@ const Visualization = () => {
       {/* Numeric Input Fields Section */}
       <div className="bg-slate-50 p-4 border border-slate-300 rounded-sm space-y-4">
         <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide border-b border-slate-200 pb-2">
-          Numeric Input Fields & Hyperparameters (Max {maxIterations} Iterations)
+          Numeric Input Fields & Hyperparameters (Up to 10,000 Iterations)
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 text-xs">
@@ -354,15 +394,15 @@ const Visualization = () => {
           </div>
 
           <div>
-            <label className="font-mono font-semibold block mb-1">Max Iterations</label>
+            <label className="font-mono font-semibold block mb-1">Max Iterations (Up to 10k)</label>
             <input
               type="number"
-              step="5"
+              step="50"
               min="5"
-              max="100"
+              max="10000"
               value={maxIterations}
-              onChange={(e) => setMaxIterations(Math.max(5, Math.min(100, parseInt(e.target.value) || 30)))}
-              className="w-full px-2 py-1 bg-white border border-slate-900 font-mono text-xs"
+              onChange={(e) => setMaxIterations(Math.max(5, Math.min(10000, parseInt(e.target.value) || 50)))}
+              className="w-full px-2 py-1 bg-white border border-slate-900 font-mono text-xs font-bold"
             />
           </div>
 
