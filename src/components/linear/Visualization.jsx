@@ -5,21 +5,36 @@ import Button from '../Button';
 import BeforeAfterThumbnail from '../diagrams/BeforeAfterThumbnail';
 import { stepGradientDescent, calculateMSE, predict } from '../../utils/linearRegression';
 
+// Fixed, deterministic dataset (no random variance)
+const FIXED_DEFAULT_POINTS = [
+  { x: 0.10, y: 0.22 },
+  { x: 0.15, y: 0.28 },
+  { x: 0.20, y: 0.25 },
+  { x: 0.28, y: 0.36 },
+  { x: 0.35, y: 0.38 },
+  { x: 0.40, y: 0.45 },
+  { x: 0.48, y: 0.48 },
+  { x: 0.55, y: 0.58 },
+  { x: 0.60, y: 0.54 },
+  { x: 0.68, y: 0.66 },
+  { x: 0.75, y: 0.72 },
+  { x: 0.82, y: 0.78 },
+  { x: 0.88, y: 0.85 },
+  { x: 0.92, y: 0.82 }
+];
+
+// Fixed starting weights & optimal learning rate for instant convergence
+const FIXED_INITIAL_M = 0.30;
+const FIXED_INITIAL_B = 0.20;
+const DEFAULT_LEARNING_RATE = 0.15;
+
 const Visualization = () => {
   // Points in normalized space [0, 1]
-  const [points, setPoints] = useState([
-    { x: 0.15, y: 0.25 },
-    { x: 0.25, y: 0.35 },
-    { x: 0.35, y: 0.30 },
-    { x: 0.45, y: 0.55 },
-    { x: 0.60, y: 0.65 },
-    { x: 0.75, y: 0.70 },
-    { x: 0.85, y: 0.88 }
-  ]);
+  const [points, setPoints] = useState(FIXED_DEFAULT_POINTS);
 
-  const [m, setM] = useState(0.0);
-  const [b, setB] = useState(0.2);
-  const [learningRate, setLearningRate] = useState(0.03);
+  const [m, setM] = useState(FIXED_INITIAL_M);
+  const [b, setB] = useState(FIXED_INITIAL_B);
+  const [learningRate, setLearningRate] = useState(DEFAULT_LEARNING_RATE);
   const [isRunning, setIsRunning] = useState(false);
   const [iterations, setIterations] = useState(0);
 
@@ -66,12 +81,12 @@ const Visualization = () => {
     setLossHistory(prev => [...prev.slice(-150), newMse]);
   }, []);
 
-  // Animation Loop (Gradient Descent)
+  // Animation Loop (Fast Gradient Descent - 25ms per step)
   useEffect(() => {
     let lastTime = 0;
     const loop = (timestamp) => {
       if (isRunningRef.current && pointsRef.current.length > 0) {
-        if (timestamp - lastTime > 40) {
+        if (timestamp - lastTime > 25) {
           lastTime = timestamp;
           handleSingleStep();
         }
@@ -108,35 +123,25 @@ const Visualization = () => {
     setPoints(prev => [...prev, { x: px, y: py }]);
   };
 
-  // Reset Model & Data
+  // Reset Model & Data to Fixed Defaults
   const handleReset = () => {
     setIsRunning(false);
-    setPoints([]);
-    setM(0.0);
-    setB(0.2);
+    setPoints(FIXED_DEFAULT_POINTS);
+    setM(FIXED_INITIAL_M);
+    setB(FIXED_INITIAL_B);
+    setLearningRate(DEFAULT_LEARNING_RATE);
     setIterations(0);
     setLossHistory([]);
   };
 
-  // Generate Sample Noisy Linear Data
+  // Load Fixed Sample Data & Reset Weights
   const handleGenerateSampleData = () => {
     setIsRunning(false);
+    setPoints(FIXED_DEFAULT_POINTS);
+    setM(FIXED_INITIAL_M);
+    setB(FIXED_INITIAL_B);
     setIterations(0);
     setLossHistory([]);
-
-    const sample = [];
-    const trueM = 0.65;
-    const trueB = 0.2;
-    for (let i = 0; i < 20; i++) {
-      const x = parseFloat((0.05 + Math.random() * 0.9).toFixed(3));
-      const noise = (Math.random() - 0.5) * 0.18;
-      const y = parseFloat(Math.max(0.05, Math.min(0.95, trueM * x + trueB + noise)).toFixed(3));
-      sample.push({ x, y });
-    }
-    sample.sort((p1, p2) => p1.x - p2.x);
-    setPoints(sample);
-    setM(0.0);
-    setB(0.2);
   };
 
   // Main Scatter & Regression Line Canvas Plot
@@ -324,11 +329,11 @@ const Visualization = () => {
             <label className="font-mono font-semibold block mb-1">Learning Rate (α)</label>
             <input
               type="number"
-              step="0.001"
-              min="0.001"
-              max="0.1"
+              step="0.01"
+              min="0.01"
+              max="0.5"
               value={learningRate}
-              onChange={(e) => setLearningRate(Math.max(0.001, Math.min(0.1, parseFloat(e.target.value) || 0.001)))}
+              onChange={(e) => setLearningRate(Math.max(0.01, Math.min(0.5, parseFloat(e.target.value) || 0.01)))}
               className="w-full px-2 py-1 bg-white border border-slate-900 font-mono text-xs"
             />
           </div>
@@ -369,7 +374,7 @@ const Visualization = () => {
         </div>
 
         {/* Manual Data Point Addition Form */}
-        <form onSubmit={handleAddManualPoint} className="pt-2 border-t border-slate-200 flex items-center gap-3 text-xs">
+        <form onSubmit={handleAddManualPoint} className="pt-2 border-t border-slate-200 flex flex-wrap items-center gap-3 text-xs">
           <span className="font-mono font-bold">Manual Point Input:</span>
           <div className="flex items-center gap-1 font-mono">
             <span>X:</span>
@@ -402,7 +407,7 @@ const Visualization = () => {
           </Button>
 
           <Button type="button" variant="outline" size="sm" onClick={handleGenerateSampleData}>
-            Sample Data
+            Fixed Sample Data
           </Button>
         </form>
       </div>
@@ -411,12 +416,12 @@ const Visualization = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
         <Slider
           label="Learning Rate Slider"
-          min={0.001}
-          max={0.1}
-          step={0.001}
+          min={0.01}
+          max={0.5}
+          step={0.01}
           value={learningRate}
           onChange={setLearningRate}
-          formatValue={(v) => v.toFixed(3)}
+          formatValue={(v) => v.toFixed(2)}
         />
 
         <div className="flex items-center gap-3">
